@@ -1,52 +1,56 @@
-from .crawler import Crawler
-from .index import Index
-from .search import SearchEngine
+# cli.py
+import threading
+from app.index import Index
+
+def print_index(index):
+    print("\n--- Indexed Documents ---")
+    with index.lock:
+        for url, doc in index.data.items():
+            token_count = len(doc.get("tokens", []))
+            print(f"{url} -> {token_count} tokens")
+    print("------------------------\n")
 
 def run_cli():
     index = Index()
-    crawler = Crawler()
-    search_engine = SearchEngine(index)
+    queue = []
+    visited = set()
 
+    def index_url(url, depth):
+        if url in visited:
+            return
+        visited.add(url)
+        index.add_document(url, f"Content of {url}", url, depth)
+        print(f"Indexed {url} with depth {depth}")
+
+    print("> Simple Web Crawler CLI")
     while True:
-        cmd = input("\n> ").strip()
-
-        if cmd.startswith("index"):
-            parts = cmd.split(maxsplit=2)  # sadece ilk 3 parçayı al
-            if len(parts) != 3:
-                print("Usage: index <url> <depth>")
+        try:
+            command_line = input("> ").strip()
+            if not command_line:
                 continue
-            _, url, depth = parts
-            try:
-                depth = int(depth)
-            except ValueError:
-                print("Depth must be an integer")
-                continue
-            crawler.start(url, depth, index)
-            print("Indexing started...")
+            parts = command_line.split()
+            command = parts[0].lower()
 
-        elif cmd.startswith("search"):
-            parts = cmd.split(maxsplit=1)
-            if len(parts) != 2:
-                print("Usage: search <query>")
-                continue
-            _, query = parts
-            results = search_engine.search(query)
-            for r in results[:10]:
-                print(r)
+            if command == "index" and len(parts) >= 3:
+                url = parts[1]
+                depth = int(parts[2])
+                threading.Thread(target=index_url, args=(url, depth)).start()
+                print("Indexing started in background...")
 
-        elif cmd == "status":
-            print(f"Visited: {len(crawler.visited)}")
-            print(f"Queue size: {crawler.queue.qsize()}")
-            print(f"Indexed docs: {len(index.data)}")
+            elif command == "status":
+                print(f"Visited: {len(visited)}")
+                print(f"Queue size: {len(queue)}")
+                print(f"Indexed docs: {len(index.data)}")
 
-        elif cmd == "exit":
-            crawler.stop()
-            print("Stopping...")
-            break
+            elif command == "list_index":
+                print_index(index)
 
-        else:
-            print("Commands:")
-            print(" index <url> <depth>")
-            print(" search <query>")
-            print(" status")
-            print(" exit")
+            elif command == "exit":
+                print("Stopping...")
+                break
+
+            else:
+                print("Unknown command. Use: index <url> <depth>, status, list_index, exit")
+
+        except Exception as e:
+            print(f"Error: {e}")
