@@ -9,11 +9,11 @@ class Index:
         self.lock = threading.Lock()
 
     def tokenize(self, text):
-        """Metni kelimelere ayırır ve küçük harfe çevirir"""
+        
         return re.findall(r"\w+", text.lower())
 
     def add_document(self, url, html, origin, depth):
-        """Yeni bir dokümanı index'e ekler"""
+        
         tokens = self.tokenize(html)
         with self.lock:
             self.data[url] = {
